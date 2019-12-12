@@ -120,7 +120,6 @@ void serialEvent1() {
 }
 
 
-
 String read_sms() {
   char incomingByte;
   String sms;
@@ -135,6 +134,8 @@ String read_sms() {
       return sms;
     }
   }
+
+  return sms;
 }
 
 
@@ -176,7 +177,8 @@ void loop() {
   AT_COMMAND receivedCommand = process_at_command();
   Serial.println("Command received :" + at_command);
   Serial.println(receivedCommand, DEC);
-   
+
+  String sms;
   switch (receivedCommand) {
   case AT:
   case AT_FACTORY_SETTINGS:
@@ -188,18 +190,19 @@ void loop() {
  
   case AT_READ_SMS:
     payload = format_status_sms();
-    reply_with_payload(payload);
+    send_payload(payload);
     break;
     
   case AT_SEND_SMS:
-    String sms = read_sms();
+    sms = read_sms();
     Serial.println("received sms:");
     Serial.println(sms);
     Serial.println("end sms");
     payload = format_send_sms_ok();
-    reply_with_payload(payload);
+    send_payload(payload);
     break;
-    
+
+  case UNKNOWN:
   default:
     send_ok();
     break;
