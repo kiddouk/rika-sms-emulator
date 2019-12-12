@@ -84,18 +84,6 @@ void setup() {
   at_command.reserve(100);
 }
  
-void eepromDump() {
-  for (int eeAddress = 0; eeAddress < 2048; eeAddress++) {
-    Serial.print(EEPROM.read(eeAddress));
-  }
-}
- 
-void saveToEeprom(char ib) {
-  EEPROM.write(eeStoreAddress, ib);
-  eeStoreAddress += 1;
- 
-}
- 
 /* &F E0
  *  CMGF=1 // Text mode for sms
  *  CNMI=0,0,0,0,1 // Configure Send/Receive stuff
