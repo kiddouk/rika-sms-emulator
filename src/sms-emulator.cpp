@@ -84,7 +84,7 @@ void setup() {
   // put your setup code here, to run once:
   Serial.begin(baudUSB);
   RIKA_COM.begin(baudRIKA);
-  Serial.println("Starting...");
+  Serial.println("Starting this program");
  
   // Alloc enough space for a long AT command. Who knows... Rika can overflow us here ;).
   at_command.reserve(100);
@@ -125,13 +125,15 @@ String read_sms() {
   String sms;
 
   sms.reserve(160);
-  
-  while(RIKA_COM.available()) {
-    incomingByte = (char) RIKA_COM.read();
-    sms += incomingByte;
-    
-    if (incomingByte == char(26)) {
-      return sms;
+
+  while (true) {
+    while(RIKA_COM.available()) {
+      incomingByte = (char) RIKA_COM.read();
+      sms += incomingByte;
+      Serial.println(sms);
+      if (incomingByte == char(26)) {
+        return sms;
+      }
     }
   }
 
@@ -153,11 +155,11 @@ void clearAtCommand() {
 }
 
 String format_status_sms() {
-  return String("+CMGR: \"REC READ\",\"+4520202020\",,\"07/04/20,10:08:02+32\"\r\n1234 ?\r\n");
+  return String("AT+CMGR: \"REC READ\",\"+4520202020\",,\"07/04/20,10:08:02+32\"\r\n1234 CT21\r\n");
 }
 
 String format_send_sms_ok() {
-  return String("+CMGS: 1");
+  return String("AT+CMGS: 1");
 }
  
 void send_payload(String payload) {
@@ -194,6 +196,7 @@ void loop() {
     break;
     
   case AT_SEND_SMS:
+    Serial.println("Entering sms reading mode");
     sms = read_sms();
     Serial.println("received sms:");
     Serial.println(sms);
