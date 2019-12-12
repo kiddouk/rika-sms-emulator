@@ -1,224 +1,167 @@
-# Hey Emacs, this is a -*- makefile -*-
+# The name of your project (used to name the compiled .hex file)
+TARGET = $(notdir $(CURDIR))
 
-# AVR-GCC Makefile template, derived from the WinAVR template (which
-# is public domain), believed to be neutral to any flavor of "make"
-# (GNU make, BSD make, SysV make)
+# The teensy version to use, 30, 31, 35, 36, or LC
+TEENSY = 31
 
+# Set to 24000000, 48000000, or 96000000 to set CPU core speed
+TEENSY_CORE_SPEED = 48000000
 
-MCU = atmega8
-FORMAT = ihex
-TARGET = demo
-SRC = $(TARGET).c
-ASRC = 
-OPT = s
+# Some libraries will require this to be defined
+# If you define this, you will break the default main.cpp
+#ARDUINO = 10600
 
-# Name of this Makefile (used for "make depend").
-MAKEFILE = Makefile
+# configurable options
+OPTIONS = -DUSB_SERIAL -DLAYOUT_US_ENGLISH
 
-# Debugging format.
-# Native formats for AVR-GCC's -g are stabs [default], or dwarf-2.
-# AVR (extended) COFF requires stabs, plus an avr-objcopy run.
-DEBUG = stabs
+# directory to build in
+BUILDDIR = $(abspath $(CURDIR)/build)
 
-# Compiler flag to set the C Standard level.
-# c89   - "ANSI" C
-# gnu89 - c89 plus GCC extensions
-# c99   - ISO C99 standard (not yet fully implemented)
-# gnu99 - c99 plus GCC extensions
-CSTANDARD = -std=gnu99
+#************************************************************************
+# Location of Teensyduino utilities, Toolchain, and Arduino Libraries.
+# To use this makefile without Arduino, copy the resources from these
+# locations and edit the pathnames.  The rest of Arduino is not needed.
+#************************************************************************
 
-# Place -D or -U options here
-CDEFS =
+# path location for Teensy Loader, teensy_post_compile and teensy_reboot
+TOOLSPATH = $(CURDIR)/tools
 
-# Place -I options here
-CINCS =
+ifeq ($(OS),Windows_NT)
+    $(error What is Win Dose?)
+else
+    UNAME_S := $(shell uname -s)
+    ifeq ($(UNAME_S),Darwin)
+        TOOLSPATH = /Applications/Arduino.app/Contents/Java/hardware/tools/
+    endif
+endif
 
+# path location for Teensy 3 core
+COREPATH = teensy3
 
-CDEBUG = -g$(DEBUG)
-CWARN = -Wall -Wstrict-prototypes
-CTUNING = -funsigned-char -funsigned-bitfields -fpack-struct -fshort-enums
-#CEXTRA = -Wa,-adhlns=$(<:.c=.lst)
-CFLAGS = $(CDEBUG) $(CDEFS) $(CINCS) -O$(OPT) $(CWARN) $(CSTANDARD) $(CEXTRA)
+# path location for Arduino libraries
+LIBRARYPATH = libraries
 
+# path location for the arm-none-eabi compiler
+COMPILERPATH = $(TOOLSPATH)/arm/bin
 
-#ASFLAGS = -Wa,-adhlns=$(<:.S=.lst),-gstabs 
+#************************************************************************
+# Settings below this point usually do not need to be edited
+#************************************************************************
 
+# CPPFLAGS = compiler options for C and C++
+CPPFLAGS = -Wall -g -Os -mthumb -ffunction-sections -fdata-sections -nostdlib -MMD $(OPTIONS) -DTEENSYDUINO=124 -DF_CPU=$(TEENSY_CORE_SPEED) -Isrc -I$(COREPATH)
 
-#Additional libraries.
+# compiler options for C++ only
+CXXFLAGS = -std=gnu++0x -felide-constructors -fno-exceptions -fno-rtti
 
-# Minimalistic printf version
-PRINTF_LIB_MIN = -Wl,-u,vfprintf -lprintf_min
+# compiler options for C only
+CFLAGS =
 
-# Floating point printf version (requires MATH_LIB = -lm below)
-PRINTF_LIB_FLOAT = -Wl,-u,vfprintf -lprintf_flt
+# linker options
+LDFLAGS = -Os -Wl,--gc-sections -mthumb
 
-PRINTF_LIB = 
+# additional libraries to link
+LIBS = -lm
 
-# Minimalistic scanf version
-SCANF_LIB_MIN = -Wl,-u,vfscanf -lscanf_min
+# compiler options specific to teensy version
+ifeq ($(TEENSY), 30)
+    CPPFLAGS += -D__MK20DX128__ -mcpu=cortex-m4
+    LDSCRIPT = $(COREPATH)/mk20dx128.ld
+    LDFLAGS += -mcpu=cortex-m4 -T$(LDSCRIPT)
+else ifeq ($(TEENSY), 31)
+    CPPFLAGS += -D__MK20DX256__ -mcpu=cortex-m4
+    LDSCRIPT = $(COREPATH)/mk20dx256.ld
+    LDFLAGS += -mcpu=cortex-m4 -T$(LDSCRIPT)
+else ifeq ($(TEENSY), LC)
+    CPPFLAGS += -D__MKL26Z64__ -mcpu=cortex-m0plus
+    LDSCRIPT = $(COREPATH)/mkl26z64.ld
+    LDFLAGS += -mcpu=cortex-m0plus -T$(LDSCRIPT)
+    LIBS += -larm_cortexM0l_math
+else ifeq ($(TEENSY), 35)
+    CPPFLAGS += -D__MK64FX512__ -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16
+    LDSCRIPT = $(COREPATH)/mk64fx512.ld
+    LDFLAGS += -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16 -T$(LDSCRIPT)
+    LIBS += -larm_cortexM4lf_math
+else ifeq ($(TEENSY), 36)
+    CPPFLAGS += -D__MK66FX1M0__ -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16
+    LDSCRIPT = $(COREPATH)/mk66fx1m0.ld
+    LDFLAGS += -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16 -T$(LDSCRIPT)
+    LIBS += -larm_cortexM4lf_math
+else
+    $(error Invalid setting for TEENSY)
+endif
 
-# Floating point + %[ scanf version (requires MATH_LIB = -lm below)
-SCANF_LIB_FLOAT = -Wl,-u,vfscanf -lscanf_flt
+# set arduino define if given
+ifdef ARDUINO
+	CPPFLAGS += -DARDUINO=$(ARDUINO)
+else
+	CPPFLAGS += -DUSING_MAKEFILE
+endif
 
-SCANF_LIB = 
+# names for the compiler programs
+CC = $(abspath $(COMPILERPATH))/arm-none-eabi-gcc
+CXX = $(abspath $(COMPILERPATH))/arm-none-eabi-g++
+OBJCOPY = $(abspath $(COMPILERPATH))/arm-none-eabi-objcopy
+SIZE = $(abspath $(COMPILERPATH))/arm-none-eabi-size
 
-MATH_LIB = -lm
+# automatically create lists of the sources and objects
+LC_FILES := $(wildcard $(LIBRARYPATH)/*/*.c)
+LCPP_FILES := $(wildcard $(LIBRARYPATH)/*/*.cpp)
+TC_FILES := $(wildcard $(COREPATH)/*.c)
+TCPP_FILES := $(wildcard $(COREPATH)/*.cpp)
+C_FILES := $(wildcard src/*.c)
+CPP_FILES := $(wildcard src/*.cpp)
+INO_FILES := $(wildcard src/*.ino)
 
-# External memory options
+# include paths for libraries
+L_INC := $(foreach lib,$(filter %/, $(wildcard $(LIBRARYPATH)/*/)), -I$(lib))
 
-# 64 KB of external RAM, starting after internal RAM (ATmega128!),
-# used for variables (.data/.bss) and heap (malloc()).
-#EXTMEMOPTS = -Wl,--section-start,.data=0x801100,--defsym=__heap_end=0x80ffff
+SOURCES := $(C_FILES:.c=.o) $(CPP_FILES:.cpp=.o) $(INO_FILES:.ino=.o) $(TC_FILES:.c=.o) $(TCPP_FILES:.cpp=.o) $(LC_FILES:.c=.o) $(LCPP_FILES:.cpp=.o)
+OBJS := $(foreach src,$(SOURCES), $(BUILDDIR)/$(src))
 
-# 64 KB of external RAM, starting after internal RAM (ATmega128!),
-# only used for heap (malloc()).
-#EXTMEMOPTS = -Wl,--defsym=__heap_start=0x801100,--defsym=__heap_end=0x80ffff
+all: hex
 
-EXTMEMOPTS =
+build: $(TARGET).elf
 
-#LDMAP = $(LDFLAGS) -Wl,-Map=$(TARGET).map,--cref
-LDFLAGS = $(EXTMEMOPTS) $(LDMAP) $(PRINTF_LIB) $(SCANF_LIB) $(MATH_LIB)
-
-
-# Programming support using avrdude. Settings and variables.
-
-AVRDUDE_PROGRAMMER = stk500
-AVRDUDE_PORT = /dev/term/a
-
-AVRDUDE_WRITE_FLASH = -U flash:w:$(TARGET).hex
-#AVRDUDE_WRITE_EEPROM = -U eeprom:w:$(TARGET).eep
-
-
-# Uncomment the following if you want avrdude's erase cycle counter.
-# Note that this counter needs to be initialized first using -Yn,
-# see avrdude manual.
-#AVRDUDE_ERASE_COUNTER = -y
-
-# Uncomment the following if you do /not/ wish a verification to be
-# performed after programming the device.
-#AVRDUDE_NO_VERIFY = -V
-
-# Increase verbosity level.  Please use this when submitting bug
-# reports about avrdude. See <http://savannah.nongnu.org/projects/avrdude> 
-# to submit bug reports.
-#AVRDUDE_VERBOSE = -v -v
-
-AVRDUDE_BASIC = -p $(MCU) -P $(AVRDUDE_PORT) -c $(AVRDUDE_PROGRAMMER)
-AVRDUDE_FLAGS = $(AVRDUDE_BASIC) $(AVRDUDE_NO_VERIFY) $(AVRDUDE_VERBOSE) $(AVRDUDE_ERASE_COUNTER)
-
-
-CC = avr-gcc
-OBJCOPY = avr-objcopy
-OBJDUMP = avr-objdump
-SIZE = avr-size
-NM = avr-nm
-AVRDUDE = avrdude
-REMOVE = rm -f
-MV = mv -f
-
-# Define all object files.
-OBJ = $(SRC:.c=.o) $(ASRC:.S=.o) 
-
-# Define all listing files.
-LST = $(ASRC:.S=.lst) $(SRC:.c=.lst)
-
-# Combine all necessary flags and optional flags.
-# Add target processor to flags.
-ALL_CFLAGS = -mmcu=$(MCU) -I. $(CFLAGS)
-ALL_ASFLAGS = -mmcu=$(MCU) -I. -x assembler-with-cpp $(ASFLAGS)
-
-
-# Default target.
-all: build
-
-build: elf hex eep
-
-elf: $(TARGET).elf
 hex: $(TARGET).hex
-eep: $(TARGET).eep
-lss: $(TARGET).lss 
-sym: $(TARGET).sym
 
+post_compile: $(TARGET).hex
+	@$(abspath $(TOOLSPATH))/teensy_post_compile -file="$(basename $<)" -path=$(CURDIR) -tools="$(abspath $(TOOLSPATH))"
 
-# Program the device.  
-program: $(TARGET).hex $(TARGET).eep
-	$(AVRDUDE) $(AVRDUDE_FLAGS) $(AVRDUDE_WRITE_FLASH) $(AVRDUDE_WRITE_EEPROM)
+reboot:
+	@-$(abspath $(TOOLSPATH))/teensy_reboot
 
+upload: post_compile reboot
 
+$(BUILDDIR)/%.o: %.c
+	@echo -e "[CC]\t$<"
+	@mkdir -p "$(dir $@)"
+	@$(CC) $(CPPFLAGS) $(CFLAGS) $(L_INC) -o "$@" -c "$<"
 
+$(BUILDDIR)/%.o: %.cpp
+	@echo -e "[CXX]\t$<"
+	@mkdir -p "$(dir $@)"
+	@$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(L_INC) -o "$@" -c "$<"
 
-# Convert ELF to COFF for use in debugging / simulating in AVR Studio or VMLAB.
-COFFCONVERT=$(OBJCOPY) --debugging \
---change-section-address .data-0x800000 \
---change-section-address .bss-0x800000 \
---change-section-address .noinit-0x800000 \
---change-section-address .eeprom-0x810000 
+$(BUILDDIR)/%.o: %.ino
+	@echo -e "[CXX]\t$<"
+	@mkdir -p "$(dir $@)"
+	@$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(L_INC) -o "$@" -x c++ -include Arduino.h -c "$<"
 
+$(TARGET).elf: $(OBJS) $(LDSCRIPT)
+	@echo -e "[LD]\t$@"
+	@$(CC) $(LDFLAGS) -o "$@" $(OBJS) $(LIBS)
 
-coff: $(TARGET).elf
-	$(COFFCONVERT) -O coff-avr $(TARGET).elf $(TARGET).cof
+%.hex: %.elf
+	@echo -e "[HEX]\t$@"
+	@$(SIZE) "$<"
+	@$(OBJCOPY) -O ihex -R .eeprom "$<" "$@"
 
+# compiler generated dependency info
+-include $(OBJS:.o=.d)
 
-extcoff: $(TARGET).elf
-	$(COFFCONVERT) -O coff-ext-avr $(TARGET).elf $(TARGET).cof
-
-
-.SUFFIXES: .elf .hex .eep .lss .sym
-
-.elf.hex:
-	$(OBJCOPY) -O $(FORMAT) -R .eeprom $< $@
-
-.elf.eep:
-	-$(OBJCOPY) -j .eeprom --set-section-flags=.eeprom="alloc,load" \
-	--change-section-lma .eeprom=0 -O $(FORMAT) $< $@
-
-# Create extended listing file from ELF output file.
-.elf.lss:
-	$(OBJDUMP) -h -S $< > $@
-
-# Create a symbol table from ELF output file.
-.elf.sym:
-	$(NM) -n $< > $@
-
-
-
-# Link: create ELF output file from object files.
-$(TARGET).elf: $(OBJ)
-	$(CC) $(ALL_CFLAGS) $(OBJ) --output $@ $(LDFLAGS)
-
-
-# Compile: create object files from C source files.
-.c.o:
-	$(CC) -c $(ALL_CFLAGS) $< -o $@ 
-
-
-# Compile: create assembler files from C source files.
-.c.s:
-	$(CC) -S $(ALL_CFLAGS) $< -o $@
-
-
-# Assemble: create object files from assembler source files.
-.S.o:
-	$(CC) -c $(ALL_ASFLAGS) $< -o $@
-
-
-
-# Target: clean project.
 clean:
-	$(REMOVE) $(TARGET).hex $(TARGET).eep $(TARGET).cof $(TARGET).elf \
-	$(TARGET).map $(TARGET).sym $(TARGET).lss \
-	$(OBJ) $(LST) $(SRC:.c=.s) $(SRC:.c=.d)
-
-depend:
-	if grep '^# DO NOT DELETE' $(MAKEFILE) >/dev/null; \
-	then \
-		sed -e '/^# DO NOT DELETE/,$$d' $(MAKEFILE) > \
-			$(MAKEFILE).$$$$ && \
-		$(MV) $(MAKEFILE).$$$$ $(MAKEFILE); \
-	fi
-	echo '# DO NOT DELETE THIS LINE -- make depend depends on it.' \
-		>> $(MAKEFILE); \
-	$(CC) -M -mmcu=$(MCU) $(CDEFS) $(CINCS) $(SRC) $(ASRC) >> $(MAKEFILE)
-
-.PHONY:	all build elf hex eep lss sym program coff extcoff clean depend
+	@echo Cleaning...
+	@rm -rf "$(BUILDDIR)"
+	@rm -f "$(TARGET).elf" "$(TARGET).hex"
 

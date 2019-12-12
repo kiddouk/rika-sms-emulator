@@ -5,10 +5,13 @@
 #define baudRIKA 115200
  
 #define EMPTY ""
+#define ECHO "E"
+#define FACTORY_RESET "&F"
 #define IPR "+IPR"
 #define DUMP "+DUMP"
 #define READ_SMS "+CMGR"
 #define DELETE_SMS "+CMGD"
+#define NEW_MESSAGE_INDICATION "+CNMI"
  
 #define RIKA_COM Serial1
  
@@ -21,11 +24,14 @@ int eeStoreAddress = 0;
  
  
 typedef enum AT_COMMAND {
-  UNKNOWN,
-  AT,
-  AT_IPR,
-  AT_READ_SMS,
-  AT_DELETE_SMS
+                         UNKNOWN,
+                         AT,
+                         AT_FACTORY_SETTINGS,
+                         AT_ECHO,
+                         AT_IPR,
+                         AT_READ_SMS,
+                         AT_DELETE_SMS,
+                         AT_NEW_MESSAGE_INDICATION
 } AT_COMMAND_t;
  
 // Process Command:
@@ -41,7 +47,7 @@ AT_COMMAND_t process_at_command() {
   }
  
   if (at_command.startsWith(IPR)) {
-   return AT_IPR;
+    return AT_IPR;
   }
  
   if (at_command.startsWith(READ_SMS)) {
@@ -50,6 +56,18 @@ AT_COMMAND_t process_at_command() {
  
   if (at_command.startsWith(DELETE_SMS)) {
     return AT_DELETE_SMS;
+  }
+
+  if (at_command.startsWith(FACTORY_RESET)) {
+    return AT_FACTORY_SETTINGS;
+  }
+
+  if (at_command.startsWith(ECHO)) {
+    return AT_ECHO;
+  }
+
+  if (at_command.startsWith(NEW_MESSAGE_INDICATION)) {
+    return AT_NEW_MESSAGE_INDICATION;
   }
  
   return UNKNOWN;
@@ -138,7 +156,6 @@ void reply_with_sms() {
 }
  
 void loop() {
- 
   // Nothing to do? See you in a bit...
   if (at_command_ready == false) {
     delay(1000);
@@ -150,19 +167,21 @@ void loop() {
   Serial.println(receivedCommand, DEC);
    
   switch (receivedCommand) {
-    case AT:
-    case AT_IPR:
-    case AT_DELETE_SMS:
-      send_ok();
-      break;
+  case AT:
+  case AT_FACTORY_SETTINGS:
+  case AT_ECHO:
+  case AT_IPR:
+  case AT_DELETE_SMS:
+    send_ok();
+    break;
  
-    case AT_READ_SMS:
-      reply_with_sms();
-      break;
+  case AT_READ_SMS:
+    reply_with_sms();
+    break;
  
-    default:
-      send_ok();
-      break;
+  default:
+    send_ok();
+    break;
   }
    
   clearAtCommand();
